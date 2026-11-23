@@ -20,10 +20,12 @@ import { likedTracksStore } from '../store/likedTracksStore';
 import { useIsTrackLiked } from '../store/useIsTrackLiked';
 import { MiniTrackCard } from '../components/MiniTrackCard';
 import { CanvasBackground } from '../components/CanvasBackground';
+import { useIdle } from '../hooks/useIdle';
 import type { Track } from '../types';
 
 const ACCENT = '#FF5500';
 const BAR_COUNT = 56;
+const IDLE_TIMEOUT_MS = 18000;
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -115,6 +117,10 @@ export function NowPlayingScreen(): React.JSX.Element {
   const { currentTrack, isPlaying, isBuffering, positionSeconds, durationSeconds, queue } = state;
   const playFocusRef = useRef<any>(null);
   const [queueOpen, setQueueOpen] = useState(false);
+  const isIdleRaw = useIdle(IDLE_TIMEOUT_MS);
+  const isIdle = isIdleRaw && !queueOpen; // never hide controls while the queue panel is open
+  const controlsOpacity = useRef(new Animated.Value(1)).current;
+  const captionOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     playFocusRef.current?.focus?.();
@@ -128,6 +134,26 @@ export function NowPlayingScreen(): React.JSX.Element {
     });
     return () => sub.remove();
   }, [queueOpen]);
+
+  // Screensaver: fade controls out slowly on idle (non-interactive,
+  // ambient transition), snap them back fast on the first new input —
+  // Apple/Emil Kowalski's asymmetric timing: slow where nothing is
+  // being decided, fast where the system must feel responsive again.
+  useEffect(() => {
+    Animated.timing(controlsOpacity, {
+      toValue: isIdle ? 0 : 1,
+      duration: isIdle ? 500 : 180,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+    Animated.timing(captionOpacity, {
+      toValue: isIdle ? 1 : 0,
+      duration: isIdle ? 500 : 150,
+      delay: isIdle ? 200 : 0,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [isIdle, controlsOpacity, captionOpacity]);
 
   const amplitudes = useMemo(
     () => (currentTrack ? seededAmplitudes(currentTrack.id, BAR_COUNT) : []),
@@ -148,7 +174,7 @@ export function NowPlayingScreen(): React.JSX.Element {
     <View style={styles.root}>
       <CanvasBackground youtubeVideoId={currentTrack.canvasYoutubeVideoId} fallbackArtworkUrl={currentTrack.artworkUrl} />
 
-      <View style={styles.main}>
+      <Animated.View style={[styles.main, { opacity: controlsOpacity }]} pointerEvents={isIdle ? 'none' : 'auto'}>
         <View style={styles.meta}>
           <Text style={styles.label}>NOW PLAYING</Text>
           <Text style={styles.title} numberOfLines={2}>
@@ -188,7 +214,17 @@ export function NowPlayingScreen(): React.JSX.Element {
         <View style={styles.artworkCard}>
           <Image source={{ uri: currentTrack.artworkUrl }} style={styles.artworkImage} resizeMode="cover" />
         </View>
-      </View>
+      </Animated.View>
+
+      {/* Screensaver caption: minimal title/artist, visible only while idle. */}
+      <Animated.View style={[styles.idleCaption, { opacity: captionOpacity }]} pointerEvents="none">
+        <Text style={styles.idleCaptionTitle} numberOfLines={1}>
+          {currentTrack.title}
+        </Text>
+        <Text style={styles.idleCaptionArtist} numberOfLines={1}>
+          {currentTrack.artist}
+        </Text>
+      </Animated.View>
 
       <QueueModal visible={queueOpen} queue={queue} currentTrack={currentTrack} onClose={() => setQueueOpen(false)} />
     </View>
@@ -387,6 +423,9 @@ const styles = StyleSheet.create({
     elevation: 12,
   },
   artworkImage: { width: '100%', height: '100%' },
+  idleCaption: { position: 'absolute', left: 56, bottom: 48 },
+  idleCaptionTitle: { color: '#fff', fontSize: 20, fontWeight: '700' },
+  idleCaptionArtist: { color: 'rgba(255,255,255,0.75)', fontSize: 14, marginTop: 4 },
   modalRoot: { flex: 1, flexDirection: 'row', justifyContent: 'flex-end' },
   modalBackdropFill: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)' },
   modalPanel: {
