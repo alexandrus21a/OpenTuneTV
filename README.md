@@ -1,97 +1,115 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# OpentuneRN
 
-# Getting Started
+An Android TV music app that streams real audio from YouTube Music — no API
+key, no Google/YouTube account, no login of any kind. A React Native
+(`react-native-tvos`) rewrite of an earlier Kotlin/Compose app, keeping the
+same core idea: NewPipeExtractor + an unauthenticated YouTube Music Innertube
+client as a native bridge, everything else rebuilt in React Native for Android
+TV's D-pad-driven UI.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+**Android TV only.** No phone/tablet/iOS target.
 
-## Step 1: Start Metro
+🇷🇺 Russian version: [README.ru.md](README.ru.md)
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+## Features
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+- **Catalog & Home** — real YouTube Music home shelves, no key/login required.
+- **Search** — tries YouTube Music's own song search first (clean titles,
+  square album art), falls back to a plain video search only if that's empty.
+- **Real playback** — audio-only stream resolution (never video) via
+  NewPipeExtractor, played with `react-native-video`.
+- **Queue** — full editable queue (reorder, remove) in a dedicated modal,
+  shuffle, repeat (off/all/one).
+- **Personalization without an account** — local-only Like and Follow, used to
+  build "Liked Songs" and "Because you follow {artist}" shelves on Home.
+- **Canvas backgrounds** — a short, silent, looping video behind Now Playing
+  (Spotify-Canvas-style), with a quality setting (Off / Low / High) in
+  Settings. Falls back to a blurred artwork background whenever Canvas is off,
+  unresolved, or unavailable for a track.
+- **Idle screensaver** — after ~18s with no remote input, Now Playing's
+  controls fade out, leaving just the Canvas/artwork and a small caption; any
+  remote press snaps the UI back instantly.
+- **In-app OTA updates** — since this isn't distributed through a store, the
+  app can check a small JSON manifest, download a newer APK, and hand it to
+  the system installer, all from Settings.
+- TV-native interaction design: D-pad focus throughout, real vector icons
+  (no emoji), press-down feedback, restrained motion, asymmetric timing
+  (fast wake / slow sleep) per Apple's and Emil Kowalski's interaction
+  principles.
 
-```sh
-# Using npm
-npm start
+## Architecture
 
-# OR using Yarn
-yarn start
+```
+src/
+  screens/       Home, NowPlaying, Search, Settings
+  components/    GlobalAudioPlayer, TrackCard, MiniTrackCard, Sidebar,
+                 CanvasBackground, UpdateSection
+  store/         playerStore, settingsStore, followedArtistsStore,
+                 likedTracksStore (all useSyncExternalStore-based, in-memory)
+  hooks/         useIdle (screensaver)
+  native/        JS wrappers around the native bridge modules
+
+android/app/src/main/java/com/opentunern/newpipe/
+  OkHttpDownloader, NewPipeBootstrap   NewPipeExtractor plumbing
+  Innertube, InnertubeModels,
+  InnertubeParser, TitleCleanup        unauthenticated YouTube Music client
+  CatalogRepository                    shelves / search / mix-queue resolution
+  StreamResolver                       audio-only & video-only stream picking
+  NewPipeModule, NewPipePackage        the RN bridge (NativeModule)
+  ProxyConfig                          dev-only SOCKS5 proxy, BuildConfig.DEBUG-gated
+  OtaModule                            manifest check / download / install
 ```
 
-## Step 2: Build and run your app
+The native Kotlin layer does all the YouTube-facing work (no API key, exactly
+like the original Compose app); React Native handles every screen, the queue,
+settings, and the TV-remote interaction model.
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+## Requirements
 
-### Android
+- Bun (package manager; **not** npm/yarn/pnpm)
+- JDK 17, Android SDK (`compileSdk`/`targetSdk` per `android/build.gradle`)
+- An Android TV device or emulator (API 30+ recommended)
 
-```sh
-# Using npm
-npm run android
+## Getting started
 
-# OR using Yarn
-yarn android
+```bash
+bun install
+bun start                       # Metro dev server
+bun run android                 # or: cd android && ./gradlew :app:installDebug
 ```
 
-### iOS
+Typecheck: `bunx tsc -p tsconfig.json --noEmit`
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+Native-only changes (anything under `android/app/src/main/java/...` or
+`AndroidManifest.xml`) need a rebuild
+(`./gradlew :app:assembleDebug --no-daemon`) and reinstall. Pure JS/TSX
+changes hot-reload through Metro — no rebuild needed.
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
+## OTA updates
 
-```sh
-bundle install
+`src/native/OtaModule.ts` exports `OTA_MANIFEST_URL`, currently a placeholder
+(`https://REPLACE_ME/...`). To enable updates, host a small JSON file
+anywhere static (your own domain, a GitHub raw URL, S3, ...) and point that
+constant at it:
+
+```json
+{
+  "versionCode": 2,
+  "versionName": "1.1",
+  "apkUrl": "https://example.com/opentune-rn/app-release.apk",
+  "notes": "What changed in this release"
+}
 ```
 
-Then, and every time you update your native dependencies, run:
+The app compares `versionCode` against the installed build, and only offers a
+download when the manifest's is higher.
 
-```sh
-bundle exec pod install
-```
+## Known gaps
 
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
+- Like/Follow and Canvas-quality settings are in-memory only — they reset on
+  app restart (no persistence layer yet).
+- `OTA_MANIFEST_URL` needs a real host before updates work outside testing.
+- Lyrics (a Musixmatch-style synced view) is a planned feature, not yet built.
+- Verified on the Android TV emulator only; no physical-device testing yet.
 
-```sh
-# Using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
-```
-
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
-
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
-
-## Step 3: Modify your app
-
-Now that you have successfully run the app, let's make changes!
-
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+See `STATUS.md` and `PLAN.md` for the detailed, up-to-date breakdown.
