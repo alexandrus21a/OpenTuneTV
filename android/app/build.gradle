@@ -1,6 +1,7 @@
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
+apply from: file("../../node_modules/react-native-vector-icons/fonts.gradle")
 
 /**
  * This is the configuration block to customize your React Native Android app.
@@ -77,6 +78,17 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+        // Required by NewPipeExtractor on minSdk < 33 (java.time/nio APIs).
+        coreLibraryDesugaringEnabled true
+    }
+
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
     namespace "com.opentunern"
     defaultConfig {
         applicationId "com.opentunern"
@@ -116,4 +128,12 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+
+    // YouTube catalog/search + audio & video stream resolving — no API key,
+    // ported from the Compose app's NewPipeExtractor-based native layer and
+    // exposed to JS via NewPipeModule (see java/com/opentunern/newpipe/).
+    implementation("com.github.teamnewpipe:NewPipeExtractor:v0.27.1")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.4")
 }
