@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSettingsState } from '../store/useSettingsState';
 import { settingsStore, type CanvasQuality } from '../store/settingsStore';
+import { UpdateSection } from '../components/UpdateSection';
 
 const ACCENT = '#FF5500';
 
@@ -33,6 +34,9 @@ export function SettingsScreen(): React.JSX.Element {
           />
         ))}
       </View>
+
+      <Text style={styles.section}>UPDATES</Text>
+      <UpdateSection />
     </View>
   );
 }

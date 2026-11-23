@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Exposes the app's own files/cache dir so FileProvider can hand the -->
+<!-- downloaded update APK to the system package installer by content:// Uri. -->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path name="ota" path="ota/" />
+</paths>

@@ -7,7 +7,7 @@ import com.facebook.react.uimanager.ViewManager
 
 class NewPipePackage : ReactPackage {
     override fun createNativeModules(reactContext: ReactApplicationContext): List<NativeModule> =
-        listOf(NewPipeModule(reactContext))
+        listOf(NewPipeModule(reactContext), OtaModule(reactContext))
 
     override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> =
         emptyList()
